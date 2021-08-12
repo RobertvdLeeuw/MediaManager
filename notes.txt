@@ -1,1 +1,5 @@
 Leave Twitch out of it, for now. Maybe add in later.
+
+External dependencies:
+  vlc
+  qbittorrent
