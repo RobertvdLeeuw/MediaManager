@@ -1,0 +1,23 @@
+  To select folder: "select <foldername>"
+  To move 1 or more folders up or back to base folder: "up: 1/2/3/etc/base"
+  To see all files/folders in folder, recursion option: "list: all/folders/files <T/F>"
+  To create folder: "createfolder: <foldername>"
+  To search for folder/item: "search: <keyword>"
+  To move file/folder: "move: <filename/foldername> <file or folder>"
+  To move all files in current folder: "moveall: <folder>"
+  To rename file or folder: "rename: <file> <newname>"
+  To delete a folder or an item: "delete <filepath/folderpath>"
+  To view current folder: "current"
+
+  To download: "download: <url> <name> [to]". Goes to currdir if no to argument
+  To play video: "play: <filename>"
+  To play from folder(s): "playfrom: <filename/foldername>[*]"
+  To play/pause: "playpause"
+  To go to next video: "next"
+  To stop and turn off video: "stop"
+  To add to queue, override, recursive: "addqueue: <T/F> <T/F> <filename/foldername>[*]"
+  To clear queue: "clearqueue"
+  To view queue: "viewqueue"
+  To change volume: "volume: <0-100>"
+
+  To close: "close"

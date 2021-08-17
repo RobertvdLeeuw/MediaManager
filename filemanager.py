@@ -1,7 +1,9 @@
 import downloader
+from argumenthandler import TFCheck, FolderCheck
+
 from pathlib import Path
 import shutil, os
-#import vlc
+
 
 def MoveItem(folder, item, to):
     if not os.path.isdir(to):
@@ -24,7 +26,7 @@ def MoveAll(folder, to):
 def DeleteItem(folder, item):
     if (folder / item).exists():
         if (folder / item).is_dir():
-            shutil.rmtree(str((folder / item).absolute()))
+            shutil.rmtree(str((folder / item).absolute()))  # Shutil because pathlib and os can only delete empty folders
             print(f"Removed folder {item}.")
         else:  # Files
             os.remove(str((folder / item).absolute()))
@@ -41,31 +43,29 @@ def RenameItem(item, newname):
         print(f"Failed to rename {item.name} to {newname}.")
 
 
-def DownloadItem(url, to, name):  # Will use downloader.py
-    pass
-
-
-def Search(folder, keyword, *args):
-    counter = 0 if len(args) == 0 else args[0]  # If a counter has been passed, use it. Otherwise create one (done on original call).
-
-    for child in folder.glob('*'):
-        if keyword in str(child.relative_to(folder)):
-            print(f"  /{str(child)}")
-            counter += 1
-
-        if child.is_dir():
-            counter = Search(child, keyword, counter)
-
-    if len(args) == 0:  # Only original call doesn't have counter passed
-        print(f"{counter} matches")
+def DownloadItem(url, to, name):  # Need more options?
+    if 'youtube' in url:
+        downloader.YouTube(url, to, name)
     else:
-        return counter
+        downloader.Torrent(url, to, name)
 
 
-def ListItems(folder, type):
+def Search(folder, keyword):
     counter = 0
 
-    for child in folder.glob('*'):
+    for child in folder.glob('**'):
+        if keyword in str(child.relative_to(folder)):
+            print(f"  /{str(child.relative_to(folder))}")
+            counter += 1
+    print(f"{counter} matches")
+
+
+def ListItems(basefolder, folder, type, recursive):
+    counter = 0
+
+    for child in (basefolder / folder).glob('**/*' if TFCheck(recursive) else '*'):
+        child = child.relative_to(basefolder)
+
         match type:
             case 'all':
                 print(f"  /{str(child)}")
@@ -89,9 +89,9 @@ def ListItems(folder, type):
         print(f"No {type} found.")
 
 
-def CreateFolder(folder, newfoldername):
+def CreateFolder(folder, newname):
     try:
-        os.mkdir(str(folder.absolute()) + f"/{newfoldername}")
-        print(f"Successfully created folder {newfoldername}.")
+        os.mkdir(str(folder.absolute()) + f"/{newname}")
+        print(f"Successfully created folder {newname}.")
     except:
-        print(f"Failed to create folder {newfoldername}.")
+        print(f"Failed to create folder {newname}.")
