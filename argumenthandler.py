@@ -3,10 +3,12 @@ from pathlib import Path
 def CheckArgumentAmount(expectedlength, arguments, nomaxargs = False):
     if len(arguments) < expectedlength:
         print("Not enough arguments.")
+        return False
     elif len(arguments) > expectedlength and not nomaxargs:
         print("Too many arguments.")
+        return False
 
-    return len(arguments) == expectedlength
+    return True
 
 
 def TFCheck(arg):

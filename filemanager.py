@@ -2,8 +2,9 @@ import downloader
 from argumenthandler import TFCheck, FolderCheck
 
 from pathlib import Path
-import shutil, os
+import shutil, os, re
 
+searchResults = list()
 
 def MoveItem(folder, item, to):
     if not os.path.isdir(to):
@@ -43,42 +44,83 @@ def RenameItem(item, newname):
         print(f"Failed to rename {item.name} to {newname}.")
 
 
-def DownloadItem(url, to, name):  # Need more options?
+def DownloadItem(url, to, name):  # Do I need more options?
     if 'youtube' in url:
         downloader.YouTube(url, to, name)
     else:
         downloader.Torrent(url, to, name)
 
 
-def Search(folder, keyword):
+def Search(folder, keyword, fullmatch): 
+    global searchResults
+
+    searchResults = list()
     counter = 0
 
-    for child in folder.glob('**'):
-        if keyword in str(child.relative_to(folder)):
-            print(f"  /{str(child.relative_to(folder))}")
-            counter += 1
-    print(f"{counter} matches")
+    if (fullmatch := TFCheck(fullmatch)) is None:
+        return
+
+    if regex := re.match('r".*"', keyword):  # r"..." for regex.
+        keyword = keyword.split('"')[1]
+
+    for child in folder.glob('**/*'):
+        if regex:
+            if fullmatch:
+                if not re.fullmatch(keyword, str(child.name)):
+                    continue
+            else:
+                if not re.match(keyword, str(child.name)):
+                    continue
+        else:
+            if fullmatch:
+                if not keyword == str(child.name):
+                    continue
+            else:
+                if not keyword in str(child.name):
+                    continue
+        counter += 1
+
+        print(f"  {counter - 1}: /{str(child.relative_to(folder))}")
+        searchResults.append(child)
+    print(f"{counter} matches." + (" Use 'goto: <index>' to go to result." if len(searchResults) > 0 else ""))
+
+
+def GoTo(index):  # Index is 0 based
+    global searchResults
+
+    if not index.isnumeric():
+        print("Invalid index.")
+        return
+
+    if int(index) >= len(searchResults):
+        print("Index outside of list.")
+        return
+
+    destination = searchResults[int(index)]
+
+    return destination if destination.is_dir() else destination.parent
 
 
 def ListItems(basefolder, folder, type, recursive):
     counter = 0
 
-    for child in (basefolder / folder).glob('**/*' if TFCheck(recursive) else '*'):
-        child = child.relative_to(basefolder)
+    if (recursive := TFCheck(recursive)) is None:
+        return
 
+    for child in (basefolder / folder).glob('**/*' if recursive else '*'):
         match type:
             case 'all':
-                print(f"  /{str(child)}")
+                print(f"  /{str(child.relative_to(basefolder))}")
                 counter += 1
 
             case 'folders':
                 if child.is_dir():
-                    print(f"  /{str(child)}")
+                    print(f"  /{str(child.relative_to(basefolder))}")
                     counter += 1
 
             case 'files':
                 if not child.is_dir():
-                    print(f"  /{str(child)}")
+                    print(f"  /{str(child.relative_to(basefolder))}")
                     counter += 1
 
             case _:
@@ -87,6 +129,19 @@ def ListItems(basefolder, folder, type, recursive):
 
     if counter == 0:
         print(f"No {type} found.")
+
+
+def FolderUp(baseFolder, currentFolder, amount):
+    folderlayer = len([x for x in str(currentFolder).split('/') if x])  # 0 is base
+
+    if (baseFolder / currentFolder) == baseFolder:  # Doesn't like the basefolder
+        print("Already in base folder.")
+    elif amount == "base":
+        return Path(str(baseFolder)).relative_to(baseFolder)
+    elif int(amount) > folderlayer:
+        print('Too far up. Use "base" as argument to move back to base folder.')
+    else:
+        return currentFolder.parents[int(amount) - 1]
 
 
 def CreateFolder(folder, newname):

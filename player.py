@@ -4,7 +4,7 @@ from subprocess import call
 from queue import Queue
 #import vlc
 
-queue = Queue()
+queue = Queue(maxsize=2048)
 currentVideo = None
 
 
@@ -35,6 +35,8 @@ def Stop():
 def PlayVideo(video):
     global currentVideo
 
+    Stop()
+
     pass
 
 
@@ -42,7 +44,8 @@ def PlayFrom(basefolder, recursive, *folders):
     ClearQueue()
     Stop()
 
-    recursive = TFCheck(recursive)
+    if (recursive := TFCheck(recursive)) is None:
+        return
 
     for folder in folders():
         if FolderCheck(basefolder, folder, item):
@@ -50,19 +53,26 @@ def PlayFrom(basefolder, recursive, *folders):
                 queue.put(video)
 
 
-def AddToQueue(basefolder, override, recursive, *items):  # Could be video(s) or folder(s)?
+def AddToQueue(folder, override, recursive, *items):  # Could be video(s) or folder(s)?
     global queue
 
-    if TFCheck(override):
+    if (override := TFCheck(override)) is None:
+        return
+    elif override:
         ClearQueue()
         Stop()
 
-    for item in items():
+    if (recursive := TFCheck(recursive)) is None:
+        return
+
+    for item in items:
+        item = item[0]  # Because, for some reason, iterating over the args returns a list of len=0 for each arg.
+
         if (folder / item).exists():
             if (folder / item).is_dir():  # Folders
-                for video in item.glob('**/*' if TFCheck(recursive) else '*'):
+                for video in item.glob('**/*' if recursive else '*'):
                     queue.put(video)
-            else:  # Items
+            else:  # Files
                 queue.put(item)
     PlayVideo(queue.get())  # Playing the first enqueued video.
 
@@ -70,13 +80,13 @@ def AddToQueue(basefolder, override, recursive, *items):  # Could be video(s) or
 def ClearQueue():
     global queue
 
-    queue = Queue()
+    queue = Queue(maxsize=2048)
 
 
 def ViewQueue():
     global queue
 
-    items = list(queue)
+    items = list(queue.queue)
 
     for item in items:
         print(f"  {GetVideoInfo(item)}")

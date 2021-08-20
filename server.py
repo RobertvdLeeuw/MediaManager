@@ -14,16 +14,18 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
         print('Invalid base folder.')
         sys.exit()
 
-    print("Start a path with '/' to show it starts from the base folder. Otherwise it'll be seen as relative to the current folder")
+    print("Start a path with '/' to show it starts from the base folder. Otherwise it'll be seen as relative to the current folder.")
 
     while True:
         #data = connection.recv(4096)
-        data = input()
+        data = input('> ')
 
         if not data:  # If it's empty
             continue
 
-        data = data.split()  # Seems cleaner to work with than "if data.split()[0] == ...".
+        inbase = str(currentFolder) == '.'
+
+        data = data.split()
 
         match data[0]:
             #File stuff
@@ -45,16 +47,7 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
                 if not CheckArgumentAmount(2, data):
                     continue
 
-                folderlayer = len([x for x in str(currentFolder).split('/') if x])  # 0 is base
-
-                if (baseFolder / currentFolder) == baseFolder:  # Doesn't like the basefolder
-                    print("Already in base folder.")
-                elif data[1] == "base":
-                    currentFolder = Path(str(baseFolder)).relative_to(baseFolder)
-                elif int(data[1]) > folderlayer:
-                    print('Too far up. Use "base" as argument to move back to base folder.')
-                else:
-                    currentFolder = currentFolder.parents[int(data[1]) - 1]
+                currentFolder = filemanager.FolderUp(baseFolder, currentFolder, data[1])
 
             case "list:":  # To see all files/folders in folder, recursion option: "list: all/folders/files <T/F>"
                 if not CheckArgumentAmount(3, data):
@@ -68,11 +61,18 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
 
                 filemanager.CreateFolder(currentFolder, data[1])
 
-            case "search:":  # To search for folder/item: "search: <keyword>"
+            case "search:":  # To search for folder/item, exact match: "search: <keyword> <T/F> (keyword in r"..." for regex)
+                if not CheckArgumentAmount(3, data):
+                    continue
+
+                filemanager.Search(baseFolder if inbase else currentFolder, data[1], data[2])
+
+            case "goto:":  # To go to a search result: "goto: <index>"
                 if not CheckArgumentAmount(2, data):
                     continue
 
-                filemanager.Search(currentFolder, data[1])
+                if destination := filemanager.GoTo(data[1]):
+                    currentFolder = (currentFolder / destination)
 
             case "move:":  # To move file/folder: "move: <filename/foldername> <file or folder>"
                 if not CheckArgumentAmount(3, data):
@@ -89,6 +89,8 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
                 filemanager.MoveAll(currentFolder, to)
 
             case "download:":  # To download: "download: <url> <name> [to]" Goes to currdir if no to argument
+                if not CheckArgumentAmount(3, data) or CheckArgumentAmount(4, data):  # Work on the error messaeg later (either too many or too few).
+                    continue
                 pass
 
             case "rename:":  # To rename file or folder: "rename: <file> <newname>"
@@ -107,16 +109,23 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
                 if not CheckArgumentAmount(1, data):
                     continue
 
-                print('/' + str(currentFolder if str(currentFolder) == '.' else currentFolder.relative_to(baseFolder)))  # Messy, I know. But there isn't really a better solution.
+                print('  /' + str(currentFolder if inbase else currentFolder.relative_to(baseFolder)))  # Messy, I know. But there isn't really a better solution.
+
+            case "base":  # To see the base folder: "base"
+                print(baseFolder)
 
             # Media stuff
             case "play:":  # To play video: "play: <filename>"
-                CheckArgumentAmount(2, data)
+                if not CheckArgumentAmount(2, data):
+                    continue
 
                 player.PlayVideo(data[1])
 
-            case "playfrom:":  # To play from folder(s): "playfrom: <filename/foldername>[*]"
-                player.PlayFrom()
+            case "playfrom:":  # To play from folder(s), recursive: "playfrom: <T/F> <filename/foldername>[*]"
+                if not CheckArgumentAmount(3, data, nomaxargs=True):
+                    continue
+
+                player.PlayFrom(data[1], data[2::])
 
             case "playpause":  # To play/pause: "playpause"
                 player.PlayPause()
@@ -128,9 +137,10 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
                 player.Stop()
 
             case "addqueue:":  # To add to queue, override, recursive: "addqueue: <T/F> <T/F> <filename/foldername>[*]"
-                CheckArgumentAmount(4, data, nomaxargs=True)
+                if not CheckArgumentAmount(4, data, nomaxargs=True):
+                    continue
 
-                player.AddToQueue(baseFolder, data[1], data[2], data[3::])
+                player.AddToQueue(baseFolder if inbase else currentFolder, data[1], data[2], data[3::])
 
             case "clearqueue":  # To clear queue: "clearqueue"
                 player.ClearQueue()
@@ -145,15 +155,15 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
                 player.ChangeVolume(data[1])
 
             # Other stuff
-            case "help":
-                for line in open('/home/robert/PycharmProjects/MediaManager/help.txt').readlines():  # Make this automatic later
+            case ("help"|"?"):
+                for line in open('help.txt').readlines():
                     print(line.replace('\n', ''))
 
             case "close":  # Case closed! Hehe.
                 sys.exit()
 
             case _:  # If command isn't recognized, send back "Invalid command"
-                print("Invalid argument. Type 'help' for help. Did you forget a colon?")
+                print("Invalid argument. Type 'help' or '?' for help. Did you forget a colon?")
 
 
 def CheckOptions(port, baseFolder):
@@ -177,6 +187,7 @@ def ServerSetup(port, baseFolder):
     ServerRun(s)
 
 if __name__ == "__main__":
+    os.chdir(os.path.dirname(os.path.realpath(__file__)))
     baseFolder = Path(sys.argv[1])
 
     #ServerSetup(sys.argv[1], sys.argv[2]);
