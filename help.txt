@@ -17,7 +17,7 @@
   To play/pause: "playpause"
   To go to next video: "next"
   To stop and turn off video: "stop"
-  To add to queue, override, recursive: "addqueue: <T/F> <T/F> <filename/foldername>[*]"
+  To add to queue, override, recursive: "addqueue: <T/F> <T/F> <filename/foldername>[*]" OR "addqueue: <T/F> search <index>[*]" for search results
   To clear queue: "clearqueue"
   To view queue: "viewqueue"
   To change volume: "volume: <0-100>"

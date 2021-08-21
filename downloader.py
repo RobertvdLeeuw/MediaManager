@@ -4,5 +4,7 @@ from requests import get
 def Torrent(url, to, name):
     pass
 
-def YouTube(url, to, name):
+def YouTube(url, to, name):  # Playlist support, channel support?
     pass
+
+# Spotify?

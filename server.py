@@ -1,7 +1,7 @@
 import player, filemanager
 from argumenthandler import CheckArgumentAmount, FolderCheck
 
-import socket, sys, os
+import socket, sys, os,re
 from pathlib import Path
 
 
@@ -136,11 +136,21 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
             case "stop":  # To stop and turn off video: "stop"
                 player.Stop()
 
-            case "addqueue:":  # To add to queue, override, recursive: "addqueue: <T/F> <T/F> <filename/foldername>[*]"
-                if not CheckArgumentAmount(4, data, nomaxargs=True):
+            case "addqueue:":  # To add to queue, override, recursive: "addqueue: <T/F> <T/F> <filename/foldername>[*]" search
+                if not CheckArgumentAmount(3 if "search" in data else 4, data, nomaxargs=True):  # No need for recursive on search
                     continue
 
-                player.AddToQueue(baseFolder if inbase else currentFolder, data[1], data[2], data[3::])
+                if "search" in data:
+                    if len(data) >= 5:
+                        files = filemanager.GetSearchResults(indexes=data[3::])
+                    else:
+                        files = filemanager.GetSearchResults()
+                else:
+                    files = data[3::]
+
+                if files:
+                    player.AddToQueue(baseFolder if inbase else currentFolder, data[1], data[2], files)
+
 
             case "clearqueue":  # To clear queue: "clearqueue"
                 player.ClearQueue()

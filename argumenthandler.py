@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 def CheckArgumentAmount(expectedlength, arguments, nomaxargs = False):
     if len(arguments) < expectedlength:

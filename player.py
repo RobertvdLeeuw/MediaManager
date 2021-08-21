@@ -8,9 +8,7 @@ queue = Queue(maxsize=2048)
 currentVideo = None
 
 
-def GetVideoInfo(path):
-    global queue
-
+def GetVideoInfo(path):  # Use ffmpeg module for this (not inhouse).
     pass
 
 
@@ -62,8 +60,9 @@ def AddToQueue(folder, override, recursive, *items):  # Could be video(s) or fol
         ClearQueue()
         Stop()
 
-    if (recursive := TFCheck(recursive)) is None:
-        return
+    if 'search' not in recursive:
+        if (recursive := TFCheck(recursive)) is None:
+            return
 
     for item in items:
         item = item[0]  # Because, for some reason, iterating over the args returns a list of len=0 for each arg.

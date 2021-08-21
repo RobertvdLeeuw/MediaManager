@@ -51,7 +51,7 @@ def DownloadItem(url, to, name):  # Do I need more options?
         downloader.Torrent(url, to, name)
 
 
-def Search(folder, keyword, fullmatch): 
+def Search(folder, keyword, fullmatch):
     global searchResults
 
     searchResults = list()
@@ -82,7 +82,7 @@ def Search(folder, keyword, fullmatch):
 
         print(f"  {counter - 1}: /{str(child.relative_to(folder))}")
         searchResults.append(child)
-    print(f"{counter} matches." + (" Use 'goto: <index>' to go to result." if len(searchResults) > 0 else ""))
+    print(f"{counter} matches." + (" Use 'goto: <index>' to go to result." if len(searchResults) > 0 else ""))  # Add search queue explanation.
 
 
 def GoTo(index):  # Index is 0 based
@@ -99,6 +99,35 @@ def GoTo(index):  # Index is 0 based
     destination = searchResults[int(index)]
 
     return destination if destination.is_dir() else destination.parent
+
+
+def GetSearchResults(indexes = 0):
+    global searchResults
+
+    if indexes == 0:  # No indexes, so all.
+        return searchResults
+
+    results = list()
+
+    for index in indexes:
+        try:
+            if re.match(r"[0-9]*::", index):
+                index = int(index.split(':')[0])
+
+                results.extend(searchResults[index::])
+            elif re.match(r"[0-9]*:[0-9]*", index):
+                indexone, indextwo = index.split(':')
+
+                results.extend(searchResults[int(indexone):int(indextwo)])
+            elif index.isnumeric():
+                results.append(searchResults[int(index)])
+            else:
+                print('Invalid index(es).')
+                return
+        except IndexError:
+            print('Invalid index(es).')
+            return
+    return results
 
 
 def ListItems(basefolder, folder, type, recursive):
