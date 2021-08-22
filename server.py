@@ -141,7 +141,7 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
                     continue
 
                 if "search" in data:
-                    if len(data) >= 5:
+                    if len(data) >= 4:
                         files = filemanager.GetSearchResults(indexes=data[3::])
                     else:
                         files = filemanager.GetSearchResults()

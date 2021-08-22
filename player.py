@@ -60,7 +60,7 @@ def AddToQueue(folder, override, recursive, *items):  # Could be video(s) or fol
         ClearQueue()
         Stop()
 
-    if 'search' not in recursive:
+    if 'search' not in recursive:  # If you want to add from the search results the third argument, for which recursion isn't needed.
         if (recursive := TFCheck(recursive)) is None:
             return
 

@@ -1,5 +1,5 @@
 import downloader
-from argumenthandler import TFCheck, FolderCheck
+from argumenthandler import TFCheck, FolderCheck, CheckNegative
 
 from pathlib import Path
 import shutil, os, re
@@ -104,30 +104,40 @@ def GoTo(index):  # Index is 0 based
 def GetSearchResults(indexes = 0):
     global searchResults
 
+    results = set()
+
     if indexes == 0:  # No indexes, so all.
         return searchResults
 
-    results = list()
+    if all('-' in index for index in indexes): # If results only need to be removed according to the query.
+        results = set(searchResults)
 
-    for index in indexes:
+    for index in indexes:  # - before an index removes it - when present.
         try:
-            if re.match(r"[0-9]*::", index):
-                index = int(index.split(':')[0])
-
-                results.extend(searchResults[index::])
-            elif re.match(r"[0-9]*:[0-9]*", index):
+            if re.match(r"-?[0-9]*:[0-9]*", index):  # From index until index. Had index:: built in, but then would also need ::index. Too many cases.
                 indexone, indextwo = index.split(':')
 
-                results.extend(searchResults[int(indexone):int(indextwo)])
-            elif index.isnumeric():
-                results.append(searchResults[int(index)])
-            else:
-                print('Invalid index(es).')
-                return
+                indexone, negative = CheckNegative(indexone)
+                indextwo = CheckNegative(indextwo)[0]
+
+                if indexone and indextwo:
+                    newresults = set(searchResults[indexone:indextwo])
+                else:
+                    raise IndexError
+            else:  # Just this index.
+                index, negative = CheckNegative(index)
+
+                if index:
+                    newresults = set([searchResults[index]])  # Turning it into a set of len 1 to use the same logic as above.
+                else:
+                    raise IndexError
+
+            results = (results - newresults) if negative else (results | newresults)
         except IndexError:
             print('Invalid index(es).')
             return
-    return results
+
+    return list(results)
 
 
 def ListItems(basefolder, folder, type, recursive):

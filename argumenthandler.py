@@ -34,3 +34,17 @@ def FolderCheck(basefolder, folder, subfolder):
         return None
 
     return target
+
+
+def CheckNegative(index):
+    negative = index[0] == '-'
+
+    if negative:
+        index = index[1::]
+
+    if index.isnumeric():
+        index = int(index)
+    else:
+        index = None
+
+    return (index, negative)
