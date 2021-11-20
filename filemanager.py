@@ -1,6 +1,7 @@
 import downloader
-from argumenthandler import TFCheck, FolderCheck, CheckNegative
+from argumenthandler import TFCheck, FolderCheck, IndexCheck
 
+from threading import Thread
 from pathlib import Path
 import shutil, os, re
 
@@ -38,17 +39,27 @@ def DeleteItem(folder, item):
 
 def RenameItem(item, newname):
     try:
+        oldname = item.name
         item.rename(str(item.parent / newname))
-        print(f"Successfully renamed {item.name} to {newname}.")
+        print(f"Successfully renamed {oldname} to {newname}.")
     except:
         print(f"Failed to rename {item.name} to {newname}.")
 
 
 def DownloadItem(url, to, name):  # Do I need more options?
+    print(f"Downloading {url} as {to}/{name}.")
+
+    if not FolderCheck(to):
+        return
+
     if 'youtube' in url:
-        downloader.YouTube(url, to, name)
+        downloadFunc = downloader.YouTube
     else:
-        downloader.Torrent(url, to, name)
+        downloadFunc = downloader.Torrent
+
+    downloadThread = Thread(target=downloadFunc, args=(url, to, name))
+    downloadThread.daemon = True;
+    downloadThread.start()
 
 
 def Search(folder, keyword, fullmatch):
@@ -101,31 +112,53 @@ def GoTo(index):  # Index is 0 based
     return destination if destination.is_dir() else destination.parent
 
 
-def GetSearchResults(indexes = 0):
+def GetSearchResults(indexes = None):
     global searchResults
 
     results = set()
 
-    if indexes == 0:  # No indexes, so all.
+    if indexes == None:  # No indexes, so all.
+        if len(searchResults) == 0:
+            print('No search results to be added.')
+            return
+
         return searchResults
 
-    if all('-' in index for index in indexes): # If results only need to be removed according to the query.
+    if all(index[0] == '-' for index in indexes): # If results only need to be removed according to the query.
         results = set(searchResults)
 
     for index in indexes:  # - before an index removes it - when present.
+        originalindex = index
+
         try:
-            if re.match(r"-?[0-9]*:[0-9]*", index):  # From index until index. Had index:: built in, but then would also need ::index. Too many cases.
-                indexone, indextwo = index.split(':')
+            if re.match(r"-?([0-9]+|:):([0-9]+|:)", index):  # From index until index. ':' to indicate beginning or end.
+                if negative := index[0] == '-':
+                    index = index[1::]
 
-                indexone, negative = CheckNegative(indexone)
-                indextwo = CheckNegative(indextwo)[0]
+                if index == ':::':  # The funny option.
+                    indexone, indextwo = 0, len(searchResults)
+                elif re.match(r"-?::[0-9]+", index):
+                    indexone, indextwo = 0, IndexCheck(index.split(':')[-1])
+                elif re.match(r"-?[0-9]+::", index):
+                    indexone, indextwo = IndexCheck(index.split(':')[0]), len(searchResults)
+                else:
+                    indexone, indextwo = index.split(':')
+                    indexone, indextwo = IndexCheck(indexone), IndexCheck(indextwo)
 
-                if indexone and indextwo:
-                    newresults = set(searchResults[indexone:indextwo])
+
+                if indexone is not None and indextwo:  # indexone=0 returns false
+                    if indexone >= indextwo:
+                        print("Second index has to be larger than first.")
+                        return
+                    else:
+                        newresults = set(searchResults[indexone:indextwo])
                 else:
                     raise IndexError
-            else:  # Just this index.
-                index, negative = CheckNegative(index)
+            else:  # Just this index.negative = index[0] == '-'
+                if negative := index[0] == '-':
+                    index = index[1::]
+
+                index = IndexCheck(index)
 
                 if index:
                     newresults = set([searchResults[index]])  # Turning it into a set of len 1 to use the same logic as above.
@@ -134,7 +167,7 @@ def GetSearchResults(indexes = 0):
 
             results = (results - newresults) if negative else (results | newresults)
         except IndexError:
-            print('Invalid index(es).')
+            print(f'Invalid index: {originalindex}.')
             return
 
     return list(results)
@@ -171,16 +204,20 @@ def ListItems(basefolder, folder, type, recursive):
 
 
 def FolderUp(baseFolder, currentFolder, amount):
-    folderlayer = len([x for x in str(currentFolder).split('/') if x])  # 0 is base
+    folderlayer = len([x for x in str(currentFolder.relative_to(baseFolder)).split('/') if x])
 
-    if (baseFolder / currentFolder) == baseFolder:  # Doesn't like the basefolder
+    if str(currentFolder) == '.':
         print("Already in base folder.")
-    elif amount == "base":
-        return Path(str(baseFolder)).relative_to(baseFolder)
-    elif int(amount) > folderlayer:
+        return currentFolder
+
+    if int(amount) > folderlayer:
         print('Too far up. Use "base" as argument to move back to base folder.')
-    else:
-        return currentFolder.parents[int(amount) - 1]
+        return currentFolder
+
+    if amount == "base":
+        return Path(str(baseFolder)).relative_to(baseFolder)
+
+    return currentFolder.parents[int(amount) - 1]
 
 
 def CreateFolder(folder, newname):

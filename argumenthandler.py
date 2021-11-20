@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 
-def CheckArgumentAmount(expectedlength, arguments, nomaxargs = False):
+def ArgumentAmountCheck(expectedlength, arguments, nomaxargs = False):
     if len(arguments) < expectedlength:
         print("Not enough arguments.")
         return False
@@ -36,15 +36,8 @@ def FolderCheck(basefolder, folder, subfolder):
     return target
 
 
-def CheckNegative(index):
-    negative = index[0] == '-'
-
-    if negative:
-        index = index[1::]
-
+def IndexCheck(index):
     if index.isnumeric():
-        index = int(index)
+        return int(index)
     else:
-        index = None
-
-    return (index, negative)
+        return None

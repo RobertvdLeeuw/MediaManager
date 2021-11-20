@@ -1,15 +1,15 @@
 from argumenthandler import TFCheck, FolderCheck
 
+from pathlib import Path
 from subprocess import call
-from queue import Queue
-#import vlc
+# import vlc
 
-queue = Queue(maxsize=2048)
+queue = list()
 currentVideo = None
 
 
 def GetVideoInfo(path):  # Use ffmpeg module for this (not inhouse).
-    pass
+    return path
 
 
 def PlayPause():
@@ -18,16 +18,21 @@ def PlayPause():
     pass
 
 
+def ViewCurrent():
+    global currentVideo
+
+    print(f"  {GetVideoInfo(currentVideo)}")
+
+
 def NextVideo():
     global queue, currentVideo
-
-    pass
+    PlayVideo(queue.pop())
 
 
 def Stop():
     global currentVideo
 
-    pass
+    currentVideo = None
 
 
 def PlayVideo(video):
@@ -35,7 +40,10 @@ def PlayVideo(video):
 
     Stop()
 
-    pass
+    print(f"Playing '{video}'.")
+    currentVideo = video
+
+    # Open a thread to sleep for as long as video plays, then pop next? Stop during nonplay (State.Ended? Ln 708).
 
 
 def PlayFrom(basefolder, recursive, *folders):
@@ -48,11 +56,11 @@ def PlayFrom(basefolder, recursive, *folders):
     for folder in folders():
         if FolderCheck(basefolder, folder, item):
             for video in item.glob('**/*' if recursive else '*'):
-                queue.put(video)
+                queue.append(video)
 
 
-def AddToQueue(folder, override, recursive, *items):  # Could be video(s) or folder(s)?
-    global queue
+def AddToQueue(folder, override, recursive, items):  # Could be video(s) or folder(s)?
+    global queue, currentVideo
 
     if (override := TFCheck(override)) is None:
         return
@@ -65,30 +73,28 @@ def AddToQueue(folder, override, recursive, *items):  # Could be video(s) or fol
             return
 
     for item in items:
-        item = item[0]  # Because, for some reason, iterating over the args returns a list of len=0 for each arg.
-
         if (folder / item).exists():
             if (folder / item).is_dir():  # Folders
                 for video in item.glob('**/*' if recursive else '*'):
-                    queue.put(video)
+                    queue.append(video)
             else:  # Files
-                queue.put(item)
-    PlayVideo(queue.get())  # Playing the first enqueued video.
+                queue.append(item)
+
+    if currentVideo is None:
+        PlayVideo(queue.pop())  # Playing the first enqueued video.
 
 
 def ClearQueue():
     global queue
 
-    queue = Queue(maxsize=2048)
+    queue = list()
 
 
 def ViewQueue():
     global queue
 
-    items = list(queue.queue)
-
-    for item in items:
-        print(f"  {GetVideoInfo(item)}")
+    for index, item in enumerate(queue):
+        print(f"  {index}: {GetVideoInfo(item)}")
 
 
 def ChangeVolume(volume):
@@ -96,8 +102,7 @@ def ChangeVolume(volume):
         volume = int(volume)
     except:
         print('Incorrect volume argument.')
-        return
-    finally:
+    else:
         if 0 <= volume <= 100:
             call(["amixer", "-D", "pulse", "sset", "Master", f"{volume}%"])
         else:

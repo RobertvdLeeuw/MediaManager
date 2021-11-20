@@ -3,3 +3,5 @@ Leave Twitch out of it, for now. Maybe add in later.
 External dependencies:
   vlc
   qbittorrent
+
+Protect with fernet and .key file? No, not needed seeing as it's only meant to be used on LAN.

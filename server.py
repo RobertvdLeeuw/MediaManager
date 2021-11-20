@@ -1,5 +1,5 @@
 import player, filemanager
-from argumenthandler import CheckArgumentAmount, FolderCheck
+from argumenthandler import ArgumentAmountCheck, FolderCheck
 
 import socket, sys, os,re
 from pathlib import Path
@@ -30,7 +30,7 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
         match data[0]:
             #File stuff
             case "select:":  # To select folder: "select <foldername>"
-                if not CheckArgumentAmount(2, data):
+                if not ArgumentAmountCheck(2, data):
                     continue
 
                 frombase = data[1][0] == '/'
@@ -44,69 +44,69 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
                     print(f'Moved to folder {data[1]}.')
 
             case "up:":  # To move 1 or more folders up or back to base folder: "up: 1/2/3/etc/base"
-                if not CheckArgumentAmount(2, data):
+                if not ArgumentAmountCheck(2, data):
                     continue
 
                 currentFolder = filemanager.FolderUp(baseFolder, currentFolder, data[1])
 
             case "list:":  # To see all files/folders in folder, recursion option: "list: all/folders/files <T/F>"
-                if not CheckArgumentAmount(3, data):
+                if not ArgumentAmountCheck(3, data):
                     continue
 
                 filemanager.ListItems(baseFolder, currentFolder, data[1], data[2])
 
             case "createfolder:":  # To create folder: "createfolder: <foldername>"
-                if not CheckArgumentAmount(2, data):
+                if not ArgumentAmountCheck(2, data):
                     continue
 
                 filemanager.CreateFolder(currentFolder, data[1])
 
             case "search:":  # To search for folder/item, exact match: "search: <keyword> <T/F> (keyword in r"..." for regex)
-                if not CheckArgumentAmount(3, data):
+                if not ArgumentAmountCheck(3, data):
                     continue
 
                 filemanager.Search(baseFolder if inbase else currentFolder, data[1], data[2])
 
             case "goto:":  # To go to a search result: "goto: <index>"
-                if not CheckArgumentAmount(2, data):
+                if not ArgumentAmountCheck(2, data):
                     continue
 
                 if destination := filemanager.GoTo(data[1]):
                     currentFolder = (currentFolder / destination)
 
             case "move:":  # To move file/folder: "move: <filename/foldername> <file or folder>"
-                if not CheckArgumentAmount(3, data):
+                if not ArgumentAmountCheck(3, data):
                     continue
 
                 to = baseFolder / data[2]
                 filemanager.MoveItem(currentFolder, data[1], to)
 
             case "moveall:":  # To move all files in current folder: "moveall: <folder>"
-                if not CheckArgumentAmount(2, data):
+                if not ArgumentAmountCheck(2, data):
                     continue
 
                 to = baseFolder / data[1]
                 filemanager.MoveAll(currentFolder, to)
 
             case "download:":  # To download: "download: <url> <name> [to]" Goes to currdir if no to argument
-                if not CheckArgumentAmount(3, data) or CheckArgumentAmount(4, data):  # Work on the error messaeg later (either too many or too few).
+                if not ArgumentAmountCheck(3, data) or ArgumentAmountCheck(4, data):  # Work on the error messaeg later (either too many or too few).
                     continue
                 pass
 
             case "rename:":  # To rename file or folder: "rename: <file> <newname>"
-                if not CheckArgumentAmount(3, data):
+                if not ArgumentAmountCheck(3, data):
                     continue
 
                 filemanager.RenameItem((currentFolder / data[1]), data[2])
 
             case "delete:":  # To delete a folder or an item: "delete <filepath/folderpath>"
-                if not CheckArgumentAmount(2, data):
+                if not ArgumentAmountCheck(2, data):
                     continue
 
                 filemanager.DeleteItem(currentFolder, data[1])
 
-            case "current":  # To view current folder: "current"
-                if not CheckArgumentAmount(1, data):
+            case "currentfolder":  # To view current folder: "current"
+                if not ArgumentAmountCheck(1, data):
                     continue
 
                 print('  /' + str(currentFolder if inbase else currentFolder.relative_to(baseFolder)))  # Messy, I know. But there isn't really a better solution.
@@ -116,13 +116,13 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
 
             # Media stuff
             case "play:":  # To play video: "play: <filename>"
-                if not CheckArgumentAmount(2, data):
+                if not ArgumentAmountCheck(2, data):
                     continue
 
                 player.PlayVideo(data[1])
 
             case "playfrom:":  # To play from folder(s), recursive: "playfrom: <T/F> <filename/foldername>[*]"
-                if not CheckArgumentAmount(3, data, nomaxargs=True):
+                if not ArgumentAmountCheck(3, data, nomaxargs=True):
                     continue
 
                 player.PlayFrom(data[1], data[2::])
@@ -137,7 +137,7 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
                 player.Stop()
 
             case "addqueue:":  # To add to queue, override, recursive: "addqueue: <T/F> <T/F> <filename/foldername>[*]" search
-                if not CheckArgumentAmount(3 if "search" in data else 4, data, nomaxargs=True):  # No need for recursive on search
+                if not ArgumentAmountCheck(3 if "search" in data else 4, data, nomaxargs=True):  # No need for recursive on search
                     continue
 
                 if "search" in data:
@@ -151,15 +151,17 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
                 if files:
                     player.AddToQueue(baseFolder if inbase else currentFolder, data[1], data[2], files)
 
-
             case "clearqueue":  # To clear queue: "clearqueue"
                 player.ClearQueue()
 
             case "viewqueue":  # To view queue: "viewqueue"
                 player.ViewQueue()
 
+            case "currentvideo":  # To view queue: "viewqueue"
+                player.ViewCurrent()
+
             case "volume:":  # To change volume: "volume: <0-100>"
-                if not CheckArgumentAmount(2, data):
+                if not ArgumentAmountCheck(2, data):
                     continue
 
                 player.ChangeVolume(data[1])
@@ -182,7 +184,7 @@ def CheckOptions(port, baseFolder):
             print("Port is already in use.")
             sys.exit()
 
-    if not os.path.isdir(baseFolder):
+    if not baseFolder.is_dir():
         print("Invalid base folder.")
         sys.exit()
 
@@ -197,8 +199,15 @@ def ServerSetup(port, baseFolder):
     ServerRun(s)
 
 if __name__ == "__main__":
+    if not ArgumentAmountCheck(3, sys.argv):
+        sys.exit()
+
     os.chdir(os.path.dirname(os.path.realpath(__file__)))
     baseFolder = Path(sys.argv[1])
-
-    #ServerSetup(sys.argv[1], sys.argv[2]);
-    ServerRun(baseFolder)
+    passcode = sys.argv[2]
+    os.path.isdir(baseFolder)
+    if input('Enter passcode: ') == passcode:
+        #ServerSetup(sys.argv[1], sys.argv[2]);
+        ServerRun(baseFolder)
+    else:
+        print('Invalid code.')
