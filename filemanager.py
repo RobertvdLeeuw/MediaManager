@@ -5,7 +5,6 @@ from typing import Union
 from threading import Thread
 from pathlib import Path
 import shutil, os, re
-from collections import defaultdict
 
 
 searchResults = list()
@@ -207,6 +206,9 @@ def ListItems(baseFolder: Path, folder: Path, searchType: str, *options):
 def FolderUp(baseFolder: Path, currentFolder: Path, amount: str) -> Path:
     folderLayer = len([x for x in str(currentFolder.relative_to(baseFolder)).split('/') if x])
 
+    if amount == "base":
+        return Path(str(baseFolder)).relative_to(baseFolder)
+
     if str(currentFolder) == '.':
         print("Already in base folder.")
         return currentFolder
@@ -214,9 +216,6 @@ def FolderUp(baseFolder: Path, currentFolder: Path, amount: str) -> Path:
     if int(amount) > folderLayer:
         print('Too far up. Use "base" as argument to move back to base folder.')
         return currentFolder
-
-    if amount == "base":
-        return Path(str(baseFolder)).relative_to(baseFolder)
 
     return currentFolder.parents[int(amount) - 1]
 

@@ -3,5 +3,17 @@ Leave Twitch out of it, for now. Maybe add in later.
 External dependencies:
   vlc
   qbittorrent
+  ffmpeg
 
-Protect with fernet and .key file? No, not needed seeing as it's only meant to be used on LAN.
+TODO:
+    Download:
+        Youtube:
+            Video
+            Playlist
+        Torrent
+        Look for possible other sources
+    VLC:
+      - Play
+        Recognize End/Stop
+      - End video
+    Server stuff

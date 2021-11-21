@@ -2,24 +2,56 @@ from argumenthandler import TFCheck, FolderCheck
 from random import shuffle
 from pathlib import Path
 from subprocess import call
+from typing import Union
 
-import vlc
+from time import perf_counter, sleep
+from vlc import MediaPlayer
 
-queue = list()
-currentVideo = None
+queue = list()  # List of filepaths
+currentVideo = MediaPlayer()
+videoStartTime = 0
+videoPauseTime = 0
 
 
 # Add repeat video toggle.
 
+def CheckVideoEnd():  # TODO: Test this.
+    global videoStartTime, videoPauseTime
 
-def GetVideoInfo(path):  # Use ffmpeg module for this (not inhouse).
+    pauseDuration = 0
+
+    while True:
+        sleep(0.01)
+
+        if currentVideo.get_length() == -1:
+            continue
+
+        if videoPauseTime:  # Moving the start time when it's paused. Best way to handle video length checking.
+            pauseDuration = perf_counter() - videoPauseTime
+        else:
+            videoStartTime += pauseDuration
+            pauseDuration = 0
+
+        if perf_counter() - videoStartTime > currentVideo.get_length() / 1000 and not currentVideo.is_playing():
+            Stop()
+
+
+def GetVideoInfo(path) -> str:  # Use ffmpeg module for this (not inhouse).
     return path
 
 
 def PlayPause():
-    global currentVideo
+    global currentVideo, videoPauseTime
 
-    pass
+    if currentVideo.get_length() == -1:
+        NextVideo()
+
+    if currentVideo.is_playing():
+        currentVideo.pause()
+        videoPauseTime = perf_counter()
+    else:
+        currentVideo.play()
+        videoPauseTime = 0
 
 
 def ViewCurrent():
@@ -28,24 +60,38 @@ def ViewCurrent():
     print(f"  {GetVideoInfo(currentVideo)}")
 
 
-def NextVideo() -> None:
-    global queue, currentVideo
+def NextVideo():
+    global queue
+
+    if not queue:
+        print("No video's in queue.")
+        return
+
     PlayVideo(queue.pop())
 
 
 def Stop():
     global currentVideo
 
-    currentVideo = None
+    if currentVideo.get_length() == -1:
+        print('No video is playing.')
+        return
+    currentVideo.stop()
+    currentVideo = MediaPlayer()
 
 
-def PlayVideo(video):
-    global currentVideo
+def PlayVideo(video: str):
+    global currentVideo, videoStartTime
 
-    Stop()
+    if currentVideo.get_length() != -1:
+        Stop()
 
     print(f"Playing '{video}'.")
-    currentVideo = video
+    currentVideo = MediaPlayer(video)  # TODO: See if you can read whether the video ended from the object.
+
+    videoStartTime = perf_counter()
+    currentVideo.play()
+    currentVideo.set_fullscreen(True)
 
     # Open a thread to sleep for as long as video plays, then pop next? Stop during nonplay (State.Ended? Ln 708).
 
@@ -73,7 +119,7 @@ def AddToQueue(folder: Path, *items):  # options are baked into items, if presen
     global queue, currentVideo
     items = list(items)  # Required for popping.
 
-    override = 'F':
+    override = 'F'
     if items[0] in ('T', 'F'):
         override = items.pop(0)
 

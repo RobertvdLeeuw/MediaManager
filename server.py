@@ -3,10 +3,13 @@ from argumenthandler import ArgumentAmountCheck, FolderCheck
 
 import socket, sys, os
 from pathlib import Path
+from threading import Thread
 
-def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, so no need for threading.
-    #conn, addr = s.accept()
 
+def ServerRun(baseFolder: Path):  # Only ever plan on 1 client connecting at a time, so no need for threading.
+    # conn, addr = s.accept()
+
+    # Does this need that str typecast?
     currentFolder = Path(str(baseFolder)).relative_to(baseFolder)  # CD inspired system, using the relative path starting from baseFolder
 
     if not currentFolder.is_dir():
@@ -15,8 +18,10 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
 
     print("Start a path with '/' to show it starts from the base folder. Otherwise it'll be seen as relative to the current folder.")
 
+    Thread(target=player.CheckVideoEnd).start()
+
     while True:
-        #data = connection.recv(4096)
+        # data = connection.recv(4096)
         data = input('> ')
 
         if not data:  # If it's empty
@@ -27,7 +32,7 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
         data = data.split()
 
         match data[0]:
-            #File stuff
+            # File stuff
             case "select:":  # To select folder: "select <foldername>"
                 if not ArgumentAmountCheck(2, data):
                     continue
@@ -116,24 +121,27 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
                 filemanager.DeleteItem(currentFolder, data[1])
 
             case "currentfolder":  # To view current folder: "currentfolder"
-                print('  /' + str(currentFolder if inBase else currentFolder.relative_to(baseFolder)))  # Messy, I know. But there isn't really a better solution.
+                print('  \\' + str(currentFolder if inBase else currentFolder.relative_to(baseFolder)))  # Messy, I know. But there isn't really a better solution.
 
             case "base":  # To see the base folder: "base"
                 print(baseFolder)
 
             # Media stuff
             case "play:":  # To play video: "play: <filename>"
-                if not ArgumentAmountCheck(2, data):
+                if not ArgumentAmountCheck((1, 2), data):
                     print("play: <filename>")
                     continue
 
-                player.PlayVideo(data[1])
+                if len(data) == 2:
+                    player.PlayVideo(str(baseFolder / currentFolder / data[1]))
+                else:
+                    player.NextVideo()
 
             case "playfrom:":  # To play from folder(s): "playfrom: [recursive] <filename/foldername>[*]"
-                if not ArgumentAmountCheck(3, data, noMaxArgs=True):
+                if not ArgumentAmountCheck((1, 3), data, noMaxArgs=True):
                     print("playfrom: [recursive] <filename(s)/foldername(s)>")
                     continue
-
+                # Add no args = play form current folder
                 player.PlayFrom(baseFolder, data[1], data[2::])
 
             case "playpause":  # To play/pause: "playpause"
@@ -190,7 +198,7 @@ def ServerRun(baseFolder):  # Only ever plan on 1 client connecting at a time, s
                 print("Invalid argument. Type 'help' or '?' for help. Did you forget a colon?")
 
 
-def CheckOptions(port, baseFolder):
+def CheckOptions(port: int, baseFolder: Path):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         if s.connect_ex(('localhost', port)) != 0:
             print("Port is already in use.")
@@ -201,14 +209,14 @@ def CheckOptions(port, baseFolder):
         sys.exit()
 
 
-def ServerSetup(port, baseFolder):
+def ServerSetup(port: int, baseFolder: Path):
     CheckOptions(port, baseFolder)
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((socket.gethostbyname(socket.gethostname()), port))  # Intended to only be used on LAN.
     s.listen(32)
 
-    ServerRun(s)
+    # ServerRun(s)
 
 
 if __name__ == "__main__":
