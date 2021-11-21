@@ -1,11 +1,15 @@
 from argumenthandler import TFCheck, FolderCheck
-
+from random import shuffle
 from pathlib import Path
 from subprocess import call
-# import vlc
+
+import vlc
 
 queue = list()
 currentVideo = None
+
+
+# Add repeat video toggle.
 
 
 def GetVideoInfo(path):  # Use ffmpeg module for this (not inhouse).
@@ -24,7 +28,7 @@ def ViewCurrent():
     print(f"  {GetVideoInfo(currentVideo)}")
 
 
-def NextVideo():
+def NextVideo() -> None:
     global queue, currentVideo
     PlayVideo(queue.pop())
 
@@ -46,21 +50,36 @@ def PlayVideo(video):
     # Open a thread to sleep for as long as video plays, then pop next? Stop during nonplay (State.Ended? Ln 708).
 
 
-def PlayFrom(basefolder, recursive, *folders):
+def PlayFrom(baseFolder: Path, *folders):  # options are baked into folders, if present.
     ClearQueue()
     Stop()
+    folders = list(folders)  # Required for popping
+
+    recursive = 'F'
+    if folders[0] in ('T', 'F'):
+        recursive = folders.pop(0)
 
     if (recursive := TFCheck(recursive)) is None:
         return
 
-    for folder in folders():
-        if FolderCheck(basefolder, folder, item):
-            for video in item.glob('**/*' if recursive else '*'):
-                queue.append(video)
+    for folder in folders:
+        if FolderCheck(baseFolder, folder):
+            for video in folder.glob('**/*' if recursive else '*'):
+                if not video.is_dir():
+                    queue.append(video)
 
 
-def AddToQueue(folder, override, recursive, items):  # Could be video(s) or folder(s)?
+def AddToQueue(folder: Path, *items):  # options are baked into items, if present.
     global queue, currentVideo
+    items = list(items)  # Required for popping.
+
+    override = 'F':
+    if items[0] in ('T', 'F'):
+        override = items.pop(0)
+
+    recursive = 'F'
+    if items[0] in ('T', 'F'):
+        recursive = items.pop(0)
 
     if (override := TFCheck(override)) is None:
         return
@@ -68,7 +87,7 @@ def AddToQueue(folder, override, recursive, items):  # Could be video(s) or fold
         ClearQueue()
         Stop()
 
-    if 'search' not in recursive:  # If you want to add from the search results the third argument, for which recursion isn't needed.
+    if 'search' not in recursive:
         if (recursive := TFCheck(recursive)) is None:
             return
 
@@ -97,13 +116,19 @@ def ViewQueue():
         print(f"  {index}: {GetVideoInfo(item)}")
 
 
-def ChangeVolume(volume):
+def ShuffleQueue():
+    global queue
+
+    shuffle(queue)
+
+
+def ChangeVolume(volume: str):
     try:
         volume = int(volume)
-    except:
-        print('Incorrect volume argument.')
-    else:
+
         if 0 <= volume <= 100:
-            call(["amixer", "-D", "pulse", "sset", "Master", f"{volume}%"])
+            call(["amixer", "-D", "pulse", "sset", "Master", f"{volume}%"])  # Does this work on OS'es besides Linux?
         else:
             print('Volume must be between 0 and 100.')
+    except ValueError:
+        print('Incorrect volume argument.')

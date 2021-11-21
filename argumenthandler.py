@@ -1,42 +1,48 @@
 from pathlib import Path
-import re
+from typing import Union
 
-def ArgumentAmountCheck(expectedlength, arguments, nomaxargs = False):
-    if len(arguments) < expectedlength:
+
+def ArgumentAmountCheck(expectedLength: Union[tuple, int], arguments: list, noMaxArgs=False) -> bool:  # Add some sort of dict that has func and args, to specify.
+    if isinstance(expectedLength, tuple):
+        minArgs, maxArgs = expectedLength
+
+        if len(arguments) < minArgs:
+            print("Not enough arguments.")
+            return False
+        elif len(arguments) > maxArgs:
+            print("Too many arguments.")
+            return False
+        return True
+
+    if len(arguments) < expectedLength:
         print("Not enough arguments.")
         return False
-    elif len(arguments) > expectedlength and not nomaxargs:
+    elif len(arguments) > expectedLength and not noMaxArgs:
         print("Too many arguments.")
         return False
-
     return True
 
 
-def TFCheck(arg):
-    if arg.upper() == "T":
-        return True
-    elif arg.upper() == 'F':
-        return False
-    else:
+def TFCheck(arg: str) -> Union[None, bool]:
+    if arg.upper() not in ("T", "F"):
         print('Invalid argument (T|F).')
         return None
+    return arg.upper() == "T"
 
 
-def FolderCheck(basefolder, folder, subfolder):
-    target = (folder / subfolder)
-
-    if not target.exists():
-        print(f"Folder '{target.relative_to(basefolder)}' not found")
+def FolderCheck(baseFolder: Path, folder: Path) -> Union[None, Path]:
+    if not folder.exists():
+        print(f"Folder '{folder.relative_to(baseFolder)}' not found")
         return None
 
-    if not target.is_dir():
-        print(f"'{target.relative_to(basefolder)}' is not a folder.")
+    if not folder.is_dir():
+        print(f"'{folder.relative_to(baseFolder)}' is not a folder.")
         return None
 
-    return target
+    return folder
 
 
-def IndexCheck(index):
+def IndexCheck(index: str) -> Union[None, int]:
     if index.isnumeric():
         return int(index)
     else:

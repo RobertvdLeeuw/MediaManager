@@ -1,31 +1,36 @@
 import downloader
 from argumenthandler import TFCheck, FolderCheck, IndexCheck
 
+from typing import Union
 from threading import Thread
 from pathlib import Path
 import shutil, os, re
+from collections import defaultdict
+
 
 searchResults = list()
 
-def MoveItem(folder, item, to):
+
+def MoveItem(folder: Path, item: str, to: Path):
     if not os.path.isdir(to):
         print("Destination folder doesn't exist.")
         return
 
     if (folder / item).exists():
         shutil.move(str((folder / item).absolute()),
-            str((to / Path(item).name).absolute()))
+            str((to / item).absolute()))
 
         print(f"Moved {item} to {to}.")
     else:
         print("File or folder not found.")
 
-def MoveAll(folder, to):
+
+def MoveAll(folder: Path, to: Path):
     for child in folder.glob('*'):
         MoveItem(folder, str(child.relative_to(folder)), to)
 
 
-def DeleteItem(folder, item):
+def DeleteItem(folder: Path, item: str):
     if (folder / item).exists():
         if (folder / item).is_dir():
             shutil.rmtree(str((folder / item).absolute()))  # Shutil because pathlib and os can only delete empty folders
@@ -37,38 +42,34 @@ def DeleteItem(folder, item):
         print("File or folder wasn't found.")
 
 
-def RenameItem(item, newname):
+def RenameItem(item: Path, newName: str):
     try:
-        oldname = item.name
-        item.rename(str(item.parent / newname))
-        print(f"Successfully renamed {oldname} to {newname}.")
-    except:
-        print(f"Failed to rename {item.name} to {newname}.")
+        oldName = item.name
+        item.rename(str(item.parent / newName))
+        print(f"Successfully renamed {oldName} to {newName}.")
+    except Exception as e:
+        print(f"Failed to rename {item.name} to {newName}. Error {e}.")
 
 
-def DownloadItem(url, to, name):  # Do I need more options?
+def DownloadItem(baseFolder: Path, url: str, to, name: str):  # Do I need more options?
     print(f"Downloading {url} as {to}/{name}.")
 
-    if not FolderCheck(to):
+    if not FolderCheck(baseFolder, to):
         return
 
-    if 'youtube' in url:
-        downloadFunc = downloader.YouTube
-    else:
-        downloadFunc = downloader.Torrent
-
-    downloadThread = Thread(target=downloadFunc, args=(url, to, name))
-    downloadThread.daemon = True;
+    downloadThread = Thread(target=downloader.DownloadManager, args=(url, to, name))
+    downloadThread.daemon = True
     downloadThread.start()
 
 
-def Search(folder, keyword, fullmatch):
+def Search(folder: Path, keyword: str, *options):
     global searchResults
 
     searchResults = list()
     counter = 0
 
-    if (fullmatch := TFCheck(fullmatch)) is None:
+    fullMatch = 'F' if not options else options[0]
+    if (fullMatch := TFCheck(fullMatch)) is None:
         return
 
     if regex := re.match('r".*"', keyword):  # r"..." for regex.
@@ -76,27 +77,28 @@ def Search(folder, keyword, fullmatch):
 
     for child in folder.glob('**/*'):
         if regex:
-            if fullmatch:
+            if fullMatch:
                 if not re.fullmatch(keyword, str(child.name)):
                     continue
             else:
                 if not re.match(keyword, str(child.name)):
                     continue
         else:
-            if fullmatch:
-                if not keyword == str(child.name):
+            if fullMatch:
+                if keyword is not str(child.name):
                     continue
             else:
-                if not keyword in str(child.name):
+                if keyword not in str(child.name):
                     continue
-        counter += 1
-
-        print(f"  {counter - 1}: /{str(child.relative_to(folder))}")
+        print(f"  {counter}: /{str(child.relative_to(folder))}")
         searchResults.append(child)
+
+        counter += 1
     print(f"{counter} matches." + (" Use 'goto: <index>' to go to result." if len(searchResults) > 0 else ""))  # Add search queue explanation.
 
 
-def GoTo(index):  # Index is 0 based
+# Returning itself if it's a folder, else the folder it's located in.
+def GoTo(index: str) -> Union[None, Path]:  # Index is 0 based
     global searchResults
 
     if not index.isnumeric():
@@ -112,23 +114,23 @@ def GoTo(index):  # Index is 0 based
     return destination if destination.is_dir() else destination.parent
 
 
-def GetSearchResults(indexes = None):
+def GetSearchResults(indexes=None) -> Union[None, list]:
     global searchResults
 
     results = set()
 
-    if indexes == None:  # No indexes, so all.
+    if not indexes:  # No indexes, so all.
         if len(searchResults) == 0:
             print('No search results to be added.')
             return
 
         return searchResults
 
-    if all(index[0] == '-' for index in indexes): # If results only need to be removed according to the query.
+    if all(index[0] == '-' for index in indexes):  # If results only need to be removed according to the query.
         results = set(searchResults)
 
     for index in indexes:  # - before an index removes it - when present.
-        originalindex = index
+        originalIndex = index
 
         try:
             if re.match(r"-?([0-9]+|:):([0-9]+|:)", index):  # From index until index. ':' to indicate beginning or end.
@@ -136,22 +138,20 @@ def GetSearchResults(indexes = None):
                     index = index[1::]
 
                 if index == ':::':  # The funny option.
-                    indexone, indextwo = 0, len(searchResults)
+                    indexOne, indexTwo = 0, len(searchResults)
                 elif re.match(r"-?::[0-9]+", index):
-                    indexone, indextwo = 0, IndexCheck(index.split(':')[-1])
+                    indexOne, indexTwo = 0, IndexCheck(index.split(':')[-1])
                 elif re.match(r"-?[0-9]+::", index):
-                    indexone, indextwo = IndexCheck(index.split(':')[0]), len(searchResults)
+                    indexOne, indexTwo = IndexCheck(index.split(':')[0]), len(searchResults)
                 else:
-                    indexone, indextwo = index.split(':')
-                    indexone, indextwo = IndexCheck(indexone), IndexCheck(indextwo)
-
-
-                if indexone is not None and indextwo:  # indexone=0 returns false
-                    if indexone >= indextwo:
+                    indexOne, indexTwo = index.split(':')
+                    indexOne, indexTwo = IndexCheck(indexOne), IndexCheck(indexTwo)
+                if indexOne is not None and indexTwo:  # indexOne=0 returns false
+                    if indexOne >= indexTwo:
                         print("Second index has to be larger than first.")
                         return
                     else:
-                        newresults = set(searchResults[indexone:indextwo])
+                        newResults = set(searchResults[indexOne:indexTwo])
                 else:
                     raise IndexError
             else:  # Just this index.negative = index[0] == '-'
@@ -161,38 +161,39 @@ def GetSearchResults(indexes = None):
                 index = IndexCheck(index)
 
                 if index:
-                    newresults = set([searchResults[index]])  # Turning it into a set of len 1 to use the same logic as above.
+                    newResults = {searchResults[index]}  # Turning it into a set of len 1 to use the same logic as above.
                 else:
                     raise IndexError
 
-            results = (results - newresults) if negative else (results | newresults)
+            results = (results - newResults) if negative else (results | newResults)
         except IndexError:
-            print(f'Invalid index: {originalindex}.')
+            print(f'Invalid index: {originalIndex}.')
             return
 
     return list(results)
 
 
-def ListItems(basefolder, folder, type, recursive):
+def ListItems(baseFolder: Path, folder: Path, searchType: str, *options):
     counter = 0
 
+    recursive = 'F' if not options else options[0]
     if (recursive := TFCheck(recursive)) is None:
         return
 
-    for child in (basefolder / folder).glob('**/*' if recursive else '*'):
-        match type:
+    for child in (baseFolder / folder).glob('**/*' if recursive else '*'):
+        match searchType:
             case 'all':
-                print(f"  /{str(child.relative_to(basefolder))}")
+                print(f"  /{str(child.relative_to(baseFolder))}")
                 counter += 1
 
             case 'folders':
                 if child.is_dir():
-                    print(f"  /{str(child.relative_to(basefolder))}")
+                    print(f"  /{str(child.relative_to(baseFolder))}")
                     counter += 1
 
             case 'files':
                 if not child.is_dir():
-                    print(f"  /{str(child.relative_to(basefolder))}")
+                    print(f"  /{str(child.relative_to(baseFolder))}")
                     counter += 1
 
             case _:
@@ -200,17 +201,17 @@ def ListItems(basefolder, folder, type, recursive):
                 return
 
     if counter == 0:
-        print(f"No {type} found.")
+        print(f"No {searchType} found.")
 
 
-def FolderUp(baseFolder, currentFolder, amount):
-    folderlayer = len([x for x in str(currentFolder.relative_to(baseFolder)).split('/') if x])
+def FolderUp(baseFolder: Path, currentFolder: Path, amount: str) -> Path:
+    folderLayer = len([x for x in str(currentFolder.relative_to(baseFolder)).split('/') if x])
 
     if str(currentFolder) == '.':
         print("Already in base folder.")
         return currentFolder
 
-    if int(amount) > folderlayer:
+    if int(amount) > folderLayer:
         print('Too far up. Use "base" as argument to move back to base folder.')
         return currentFolder
 
@@ -220,9 +221,9 @@ def FolderUp(baseFolder, currentFolder, amount):
     return currentFolder.parents[int(amount) - 1]
 
 
-def CreateFolder(folder, newname):
+def CreateFolder(folder, newName):
     try:
-        os.mkdir(str(folder.absolute()) + f"/{newname}")
-        print(f"Successfully created folder {newname}.")
-    except:
-        print(f"Failed to create folder {newname}.")
+        os.mkdir(str(folder.absolute()) + f"/{newName}")
+        print(f"Successfully created folder {newName}.")
+    except Exception as e:
+        print(f"Failed to create folder {newName}. Error: {e}.")
