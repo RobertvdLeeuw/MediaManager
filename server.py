@@ -1,9 +1,10 @@
 import player, filemanager
-from argumenthandler import ArgumentAmountCheck, FolderCheck
+from argumenthandler import ArgumentAmountCheck, FolderCheck, IndexCheck
 
 import socket, sys, os
 from pathlib import Path
 from threading import Thread
+from getpass import getpass
 
 
 def ServerRun(baseFolder: Path):  # Only ever plan on 1 client connecting at a time, so no need for threading.
@@ -18,7 +19,9 @@ def ServerRun(baseFolder: Path):  # Only ever plan on 1 client connecting at a t
 
     print("Start a path with '/' to show it starts from the base folder. Otherwise it'll be seen as relative to the current folder.")
 
-    Thread(target=player.CheckVideoEnd).start()
+    endCheckThread = Thread(target=player.CheckVideoEnd)
+    endCheckThread.daemon = True
+    endCheckThread.start()
 
     while True:
         # data = connection.recv(4096)
@@ -27,7 +30,7 @@ def ServerRun(baseFolder: Path):  # Only ever plan on 1 client connecting at a t
         if not data:  # If it's empty
             continue
 
-        inBase = str(currentFolder) == '.'  # Returns '.' if the current folder is the base folder.
+        inBase = currentFolder == baseFolder  # Returns '.' if the current folder is the base folder.
 
         data = data.split()
 
@@ -38,7 +41,7 @@ def ServerRun(baseFolder: Path):  # Only ever plan on 1 client connecting at a t
                     continue
 
                 fromBase = data[1][0] == '/'  # Showing whether it's a relative to current or base folder.
-                if fromBase or str(currentFolder) == '.':
+                if fromBase or inBase:
                     folder = baseFolder / data[1][1::] if fromBase else baseFolder / data[1]
                     newFolder = FolderCheck(baseFolder, folder)
                 else:
@@ -51,6 +54,10 @@ def ServerRun(baseFolder: Path):  # Only ever plan on 1 client connecting at a t
             case "up:":  # To move 1 or more folders up or back to base folder: "up: 1/2/3/.../base"
                 if not ArgumentAmountCheck(2, data):
                     print("up: 1/2/3/.../base")
+                    continue
+
+                if not IndexCheck(data[1]):
+                    print("Invalid index")
                     continue
 
                 currentFolder = filemanager.FolderUp(baseFolder, currentFolder, data[1])
@@ -100,11 +107,15 @@ def ServerRun(baseFolder: Path):  # Only ever plan on 1 client connecting at a t
                 to = baseFolder / data[1]
                 filemanager.MoveAll(currentFolder, to)
 
-            case "download:":  # To download: "download: <url> <name> [to]" Goes to currdir if no to argument
+            case "download:":  # To download: "download: <url> [to] [name]" Goes to currdir if no to argument
                 if not ArgumentAmountCheck((3, 4), data):
                     print("download: <url> <name> [to]")
                     continue
-                pass
+
+                filemanager.DownloadItem(baseFolder,
+                                         data[1],
+                                         currentFolder if data[2] == 'current' else Path(data[2]),
+                                         *data[3::])
 
             case "rename:":  # To rename file or folder: "rename: <file> <newname>"
                 if not ArgumentAmountCheck(3, data):
@@ -138,14 +149,20 @@ def ServerRun(baseFolder: Path):  # Only ever plan on 1 client connecting at a t
                     player.NextVideo()
 
             case "playfrom:":  # To play from folder(s): "playfrom: [recursive] <filename/foldername>[*]"
-                if not ArgumentAmountCheck((1, 3), data, noMaxArgs=True):
-                    print("playfrom: [recursive] <filename(s)/foldername(s)>")
-                    continue
-                # Add no args = play form current folder
-                player.PlayFrom(baseFolder, data[1], data[2::])
+                # if not ArgumentAmountCheck((1, 2), data, noMaxArgs=True):
+                #     print("playfrom: [recursive] <filename(s)/foldername(s)>")
+                #     continue
+
+                player.PlayFrom(baseFolder, currentFolder, *data[1::])
 
             case "playpause":  # To play/pause: "playpause"
                 player.PlayPause()
+
+            case "repeat:":  # To toggle video repeating: "repeat: [state]". No second arguments switches repeat state.
+                if not ArgumentAmountCheck((1, 2), data):  # No need for recursive on search
+                    print("repeat: [state]")
+                    continue
+                player.ToggleRepeat(*data[1::])
 
             case "next:":  # To go to next video: "next"
                 player.NextVideo()
@@ -165,7 +182,7 @@ def ServerRun(baseFolder: Path):  # Only ever plan on 1 client connecting at a t
                     files = data[3::]
 
                 if files:
-                    player.AddToQueue(baseFolder if inBase else currentFolder, data[1], data[2], files)
+                    player.AddToQueue(baseFolder if inBase else currentFolder, data[1], data[2], *files)
 
             case "clearqueue":  # To clear queue: "clearqueue"
                 player.ClearQueue()
@@ -184,7 +201,7 @@ def ServerRun(baseFolder: Path):  # Only ever plan on 1 client connecting at a t
                     print("volume: <0-100>")
                     continue
 
-                player.ChangeVolume(data[1])
+                player.ChangeVolume(data[1])  # TODO: https://vitux.com/how-to-turn-off-your-monitor-using-a-python-script-in-ubuntu/
 
             # Other stuff
             case "help" | "?":
@@ -227,7 +244,7 @@ if __name__ == "__main__":
     baseFolder = Path(sys.argv[1])
     passcode = sys.argv[2]
     os.path.isdir(baseFolder)
-    if input('Enter passcode: ') == passcode:
+    if getpass('Enter passcode: ') == passcode:
         # ServerSetup(sys.argv[1], sys.argv[2]);
         ServerRun(baseFolder)
     else:

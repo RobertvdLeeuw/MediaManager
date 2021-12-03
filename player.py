@@ -1,57 +1,53 @@
-from argumenthandler import TFCheck, FolderCheck
-from random import shuffle
-from pathlib import Path
-from subprocess import call
-from typing import Union
+from argumenthandler import TFCheck, FolderCheck, IndexCheck
 
-from time import perf_counter, sleep
+from random import shuffle
 from vlc import MediaPlayer
+from ffprobe import FFProbe
+
+from pathlib import Path
+from time import sleep
+
 
 queue = list()  # List of filepaths
 currentVideo = MediaPlayer()
-videoStartTime = 0
-videoPauseTime = 0
+manuallyPaused = False
+repeat = False
+volume = 100
 
 
-# Add repeat video toggle.
-
-def CheckVideoEnd():  # TODO: Test this.
-    global videoStartTime, videoPauseTime
-
-    pauseDuration = 0
+def CheckVideoEnd():
+    global manuallyPaused
 
     while True:
-        sleep(0.01)
+        sleep(1)
 
         if currentVideo.get_length() == -1:
             continue
 
-        if videoPauseTime:  # Moving the start time when it's paused. Best way to handle video length checking.
-            pauseDuration = perf_counter() - videoPauseTime
-        else:
-            videoStartTime += pauseDuration
-            pauseDuration = 0
-
-        if perf_counter() - videoStartTime > currentVideo.get_length() / 1000 and not currentVideo.is_playing():
+        if not manuallyPaused and not currentVideo.is_playing():
             Stop()
+            NextVideo()
 
 
-def GetVideoInfo(path) -> str:  # Use ffmpeg module for this (not inhouse).
+def GetVideoInfo(path) -> str:
+    # Length, FPS, Title, Resolution
+    video = FFProbe(path)
+
     return path
 
 
 def PlayPause():
-    global currentVideo, videoPauseTime
+    global currentVideo, manuallyPaused
 
     if currentVideo.get_length() == -1:
         NextVideo()
 
     if currentVideo.is_playing():
         currentVideo.pause()
-        videoPauseTime = perf_counter()
+        manuallyPaused = True
     else:
         currentVideo.play()
-        videoPauseTime = 0
+        manuallyPaused = False
 
 
 def ViewCurrent():
@@ -60,59 +56,82 @@ def ViewCurrent():
     print(f"  {GetVideoInfo(currentVideo)}")
 
 
+def ToggleRepeat(*options):
+    global repeat
+
+    state = None if not options else options[0]
+    if state and TFCheck(state) is None:
+        return
+
+    repeat = TFCheck(state) if state else not repeat
+
+    print(f"Turned {'on' if repeat else 'off'} video repeat.")
+
+
 def NextVideo():
-    global queue
+    global queue, repeat, currentVideo
 
     if not queue:
         print("No video's in queue.")
         return
 
-    PlayVideo(queue.pop())
+    PlayVideo(currentVideo if repeat else queue.pop())
 
 
 def Stop():
-    global currentVideo
+    global currentVideo, repeat
 
     if currentVideo.get_length() == -1:
         print('No video is playing.')
         return
+
     currentVideo.stop()
+
+    if repeat:
+        return
+
     currentVideo = MediaPlayer()
 
 
 def PlayVideo(video: str):
-    global currentVideo, videoStartTime
+    global currentVideo, volume
 
     if currentVideo.get_length() != -1:
         Stop()
 
     print(f"Playing '{video}'.")
-    currentVideo = MediaPlayer(video)  # TODO: See if you can read whether the video ended from the object.
+    currentVideo = MediaPlayer(video)
 
-    videoStartTime = perf_counter()
     currentVideo.play()
     currentVideo.set_fullscreen(True)
+    currentVideo.audio_set_volume(volume)
 
-    # Open a thread to sleep for as long as video plays, then pop next? Stop during nonplay (State.Ended? Ln 708).
 
+def PlayFrom(baseFolder: Path, currentFolder: Path, *folders):  # options are baked into folders, if present.
+    global queue, currentVideo
 
-def PlayFrom(baseFolder: Path, *folders):  # options are baked into folders, if present.
     ClearQueue()
-    Stop()
+    if currentVideo.get_length() != -1:
+        Stop()
+
     folders = list(folders)  # Required for popping
 
     recursive = 'F'
     if folders[0] in ('T', 'F'):
         recursive = folders.pop(0)
 
-    if (recursive := TFCheck(recursive)) is None:
+    if recursive := TFCheck(recursive):
         return
+
+    if not folders:
+        folders.append(baseFolder / currentFolder)
 
     for folder in folders:
         if FolderCheck(baseFolder, folder):
             for video in folder.glob('**/*' if recursive else '*'):
                 if not video.is_dir():
                     queue.append(video)
+    NextVideo()
 
 
 def AddToQueue(folder: Path, *items):  # options are baked into items, if present.
@@ -145,7 +164,7 @@ def AddToQueue(folder: Path, *items):  # options are baked into items, if presen
             else:  # Files
                 queue.append(item)
 
-    if currentVideo is None:
+    if currentVideo.get_length() != -1:
         PlayVideo(queue.pop())  # Playing the first enqueued video.
 
 
@@ -168,13 +187,16 @@ def ShuffleQueue():
     shuffle(queue)
 
 
-def ChangeVolume(volume: str):
-    try:
-        volume = int(volume)
+def ChangeVolume(inputVolume: str):
+    global currentVideo, volume
 
-        if 0 <= volume <= 100:
-            call(["amixer", "-D", "pulse", "sset", "Master", f"{volume}%"])  # Does this work on OS'es besides Linux?
+    if inputVolume := IndexCheck(inputVolume):
+        if 0 <= inputVolume <= 100:
+            if currentVideo.get_length() == -1:
+                currentVideo.audio_set_volume(inputVolume)
+
+            volume = inputVolume
         else:
             print('Volume must be between 0 and 100.')
-    except ValueError:
-        print('Incorrect volume argument.')
+    else:
+        print('Volume argument is not a number.')

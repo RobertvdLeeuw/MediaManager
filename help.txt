@@ -13,10 +13,11 @@
   To rename file or folder: "rename: <file> <newname>"
   To delete a folder or an item: "delete <filepath/folderpath>"
 
-  To download: "download: <url> <name> [to]". Goes to currdir if no to argument
+  To download: "download: <url> [to] [name]
   To play video: "play: <filename>"
   To play from folder(s): "playfrom: [recursive] <filename(s)/foldername(s)>"
   To play/pause: "playpause"
+  To toggle video repeating: "repeat: [state]". No second arguments switches repeat state.
   To go to next video: "next"
   To stop and turn off video: "stop"
   To add to queue "addqueue: [override] [recursive] <filename/foldername>[*]" OR "addqueue: [override] search <index>[*]" for search results

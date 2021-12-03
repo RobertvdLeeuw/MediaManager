@@ -2,18 +2,19 @@ Leave Twitch out of it, for now. Maybe add in later.
 
 External dependencies:
   vlc
-  qbittorrent
-  ffmpeg
+  qbittorrentapi
+
 
 TODO:
     Download:
         Youtube:
-            Video
-            Playlist
-        Torrent
+          - Video
+          - Playlist
+      - Torrent
         Look for possible other sources
-    VLC:
+  - VLC:
       - Play
-        Recognize End/Stop
+      - Recognize End/Stop
       - End video
+      - Test queue
     Server stuff

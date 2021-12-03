@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import Union
 
 
-def ArgumentAmountCheck(expectedLength: Union[tuple, int], arguments: list, noMaxArgs=False) -> bool:  # Add some sort of dict that has func and args, to specify.
+def ArgumentAmountCheck(expectedLength: tuple | int, arguments: list, noMaxArgs=False) -> bool:  # Add some sort of dict that has func and args, to specify.
     if isinstance(expectedLength, tuple):
         minArgs, maxArgs = expectedLength
 
@@ -23,14 +22,14 @@ def ArgumentAmountCheck(expectedLength: Union[tuple, int], arguments: list, noMa
     return True
 
 
-def TFCheck(arg: str) -> Union[None, bool]:
+def TFCheck(arg: str) -> None | bool:
     if arg.upper() not in ("T", "F"):
         print('Invalid argument (T|F).')
         return None
     return arg.upper() == "T"
 
 
-def FolderCheck(baseFolder: Path, folder: Path) -> Union[None, Path]:
+def FolderCheck(baseFolder: Path, folder: Path) -> None | Path:
     if not folder.exists():
         print(f"Folder '{folder.relative_to(baseFolder)}' not found")
         return None
@@ -42,7 +41,7 @@ def FolderCheck(baseFolder: Path, folder: Path) -> Union[None, Path]:
     return folder
 
 
-def IndexCheck(index: str) -> Union[None, int]:
+def IndexCheck(index: str) -> None | int:
     if index.isnumeric():
         return int(index)
     else:

@@ -1,7 +1,6 @@
 import downloader
 from argumenthandler import TFCheck, FolderCheck, IndexCheck
 
-from typing import Union
 from threading import Thread
 from pathlib import Path
 import shutil, os, re
@@ -50,15 +49,18 @@ def RenameItem(item: Path, newName: str):
         print(f"Failed to rename {item.name} to {newName}. Error {e}.")
 
 
-def DownloadItem(baseFolder: Path, url: str, to, name: str):  # Do I need more options?
-    print(f"Downloading {url} as {to}/{name}.")
-
+def DownloadItem(baseFolder: Path, url: str, to: Path, *options):  # Do I need more options?
     if not FolderCheck(baseFolder, to):
         return
 
-    downloadThread = Thread(target=downloader.DownloadManager, args=(url, to, name))
-    downloadThread.daemon = True
-    downloadThread.start()
+    options = list(options)
+
+    if not options:
+        print(f"Downloading {url} as {to} with original name.")
+        Thread(target=downloader.DownloadManager, args=(baseFolder, url, to)).start()
+    else:
+        print(f"Downloading {url} as {to}\\{options[0]}.")
+        Thread(target=downloader.DownloadManager, args=(baseFolder, url, to, options[0])).start()
 
 
 def Search(folder: Path, keyword: str, *options):
@@ -76,28 +78,21 @@ def Search(folder: Path, keyword: str, *options):
 
     for child in folder.glob('**/*'):
         if regex:
-            if fullMatch:
-                if not re.fullmatch(keyword, str(child.name)):
-                    continue
-            else:
-                if not re.match(keyword, str(child.name)):
-                    continue
+            match = re.fullmatch(keyword, str(child.name)) if fullMatch else re.match(keyword, str(child.name))
         else:
-            if fullMatch:
-                if keyword is not str(child.name):
-                    continue
-            else:
-                if keyword not in str(child.name):
-                    continue
-        print(f"  {counter}: /{str(child.relative_to(folder))}")
+            match = keyword is str(child.name) if fullMatch else keyword in str(child.name)
+        if not match:
+            continue
+
+        print(f"  {counter}: \\{child.relative_to(folder)}")
         searchResults.append(child)
 
         counter += 1
-    print(f"{counter} matches." + (" Use 'goto: <index>' to go to result." if len(searchResults) > 0 else ""))  # Add search queue explanation.
+    print(f"{counter} matches." + (" Use 'goto: <index>' to go to result." if searchResults else ""))  # Add search queue explanation.
 
 
 # Returning itself if it's a folder, else the folder it's located in.
-def GoTo(index: str) -> Union[None, Path]:  # Index is 0 based
+def GoTo(index: str) -> None | Path:  # Index is 0 based
     global searchResults
 
     if not index.isnumeric():
@@ -113,7 +108,7 @@ def GoTo(index: str) -> Union[None, Path]:  # Index is 0 based
     return destination if destination.is_dir() else destination.parent
 
 
-def GetSearchResults(indexes=None) -> Union[None, list]:
+def GetSearchResults(indexes=None) -> None | list:
     global searchResults
 
     results = set()
@@ -168,7 +163,6 @@ def GetSearchResults(indexes=None) -> Union[None, list]:
         except IndexError:
             print(f'Invalid index: {originalIndex}.')
             return
-
     return list(results)
 
 
@@ -207,9 +201,9 @@ def FolderUp(baseFolder: Path, currentFolder: Path, amount: str) -> Path:
     folderLayer = len([x for x in str(currentFolder.relative_to(baseFolder)).split('/') if x])
 
     if amount == "base":
-        return Path(str(baseFolder)).relative_to(baseFolder)
+        return baseFolder.relative_to(baseFolder)
 
-    if str(currentFolder) == '.':
+    if currentFolder == baseFolder:
         print("Already in base folder.")
         return currentFolder
 
